@@ -1,0 +1,9 @@
+thuya myint
+8:04 PM
+0.0.0.0/0
+thuya myint
+8:16 PM
+- [Convert]::ToBase64String((1..32 | ForEach-Object {Get-Random -Minimum 0 -Maximum 256}))
+- [Convert]::ToBase64String((1..16 | ForEach-Object {Get-Random -Minimum 0 -Maximum 256}))
+- openssl rand -base64 32
+- openssl rand -base64 16
