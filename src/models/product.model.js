@@ -48,7 +48,6 @@ const productModelSchema = new mongoose.Schema({
         required:false
     }
 
-
 },{
     timestamps:true
 })
