@@ -1,11 +1,11 @@
 const mongoose =require('mongoose')
-const { useRef } = require('react')
 const categoryModel = require('./category.model')
-
+const unitModel = require('./unit.model')
 const productModelSchema = new mongoose.Schema({
     name:{
         type: String,
         required: true,
+        unique: false
     },
     description:{
         type:String,
@@ -15,7 +15,8 @@ const productModelSchema = new mongoose.Schema({
     shortDescription:{
         type:String,
         trim:true,
-        maxlength:200
+        maxlength:200,
+        required:false  
     },
     brand:{
         type:String,
@@ -34,6 +35,17 @@ const productModelSchema = new mongoose.Schema({
     price:{
         type:Number,
         required:true
+    },
+    unit:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'Unit',
+        required:false,
+        default:"68aa8b954e1f4644df9dfd0f"
+    },
+    category:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'Category',
+        required:false
     }
 
 

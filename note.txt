@@ -7,3 +7,22 @@ thuya myint
 - [Convert]::ToBase64String((1..16 | ForEach-Object {Get-Random -Minimum 0 -Maximum 256}))
 - openssl rand -base64 32
 - openssl rand -base64 16
+
+{
+    "name":"iPhone 16 Pro Max",
+    "description":"Apple Certified Product",
+    "brand":"Apple",
+    "model":"16 Series",
+    "varient":[
+        {
+            "color":"black",
+            "hex":"#000"
+        },
+        {
+            "color":"silver",
+            "hex":"#c0c0c0"
+        }
+    ],
+    "price":1599,
+    "category":"68a881f0f711811286325ce3"
+}
