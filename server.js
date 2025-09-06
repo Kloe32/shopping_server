@@ -13,7 +13,8 @@ const productRoute = require('./src/routes/product.route')
 app.use(express.json())
 app.use(cors(
     'http://localhost:4000',
-    "https://shopping-server-nerj.onrender.com"    
+    "https://shopping-server-nerj.onrender.com",
+    "https://shopping-admin-nh09pidsp-sai-saing-wans-projects.vercel.app/"    
 ))
 app.listen(port, ()=>{
     console.log(`Server is listening at http://localhost:${port}`)
