@@ -12,7 +12,8 @@ const productRoute = require('./src/routes/product.route')
 
 app.use(express.json())
 app.use(cors(
-    'http://localhost:4000'    
+    'http://localhost:4000',
+    "https://shopping-server-nerj.onrender.com"    
 ))
 app.listen(port, ()=>{
     console.log(`Server is listening at http://localhost:${port}`)
