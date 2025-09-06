@@ -1,15 +1,21 @@
+const { createToken } = require('../helper/common.helper')
 const { encryption, comparison } = require('../helper/encryptDecrypt')
 const userModel =require('../models/user.model')
 
 const registerUser = async (req,res) =>{
     try {
-        const password = req.body.password
+        // const foundUser = await userModel.findOne(req.body.email)
+        // if (foundUser){
+        //     res.status(401).json({message:"User already Exist!"})
+        // }
         const response =await userModel.create(
             {...req.body,
             password: encryption(req.body.password)}
-
         )
-        res.status(200).json({message: "User Created Successfully", data: response})
+        const {name,email,role} = response
+        const token = createToken({name,email,role},'1d')
+
+        res.status(200).json({message: "Registered Successfully", data: response,token: token,success:true})
     } catch (error) {
         res.status(500).json(error)
     }
@@ -27,16 +33,20 @@ const loginUser = async (req,res) =>{
     try{
         const {email,password} = req.body
         const foundUser = await userModel.findOne({email: email})
-
+        
         if (!foundUser){
             return res.status(404).json({message: "User Do Not Exist."})
         }
+
+        
         if (!comparison(password,foundUser.password)){
             return res.status(403).json({message:"User not Authorized."})
         }
         return res.status(200).json({
             data: foundUser,
-            message:"Login Successful!"
+            token: createToken({name:foundUser.name, email:foundUser.email, role:foundUser.role}),
+            message:"Login Successful!",
+            success:true
         })
 
     }catch(error){

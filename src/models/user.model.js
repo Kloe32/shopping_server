@@ -18,9 +18,14 @@ const userModelSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum:["admin","user","salesperson"],
+        enum:["admin","user","manager","superadmin"],
         required: true,
         default:"user"
+    },
+    allowedRoutes:{
+        type:[String],
+        required:true,
+        unique:false,
     }
 
 },{
