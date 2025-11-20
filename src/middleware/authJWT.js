@@ -10,7 +10,7 @@ const verifyToken= (req,res,next)=>{
     jwt.verify(token,config.SECRET_KEY,async (err, decoded)=>{
         if(err){
             console.log(err)
-            return res.status(401).send({message:"Unauthorized",success:false})
+            return res.status(401).send({message:"Unauthorized Token",success:false})
         }
         req.name = decoded.name
         req.email = decoded.email

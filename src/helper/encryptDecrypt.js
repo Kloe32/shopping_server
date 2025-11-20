@@ -7,6 +7,17 @@ const decodeBase64 = (data) =>Buffer.from(data,"base64").toString("utf8");
 const generateRandomString= (length =32 ) =>crypto.randomBytes(length).toString("hex")
 const generateRandomNumber =()=>Math.floor(Math.random() * 1_000_000);
 const generateUUID =()=>uuidv4();
+const generateTempToken = () => {
+  const unHashedToken = crypto.randomBytes(20).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha-256")
+    .update(unHashedToken)
+    .digest("hex");
+
+  const tokenExpiry = Date.now() + 20 * 60 * 1000; //20mins
+  return { unHashedToken, hashedToken, tokenExpiry };
+};
 
 const deriveKey =(salt)=>
     crypto.pbkdf2Sync(config.SECRET_KEY,salt,100_000,32,"sha512");
@@ -53,6 +64,7 @@ module.exports ={
     decodeBase64,
     generateRandomString,
     generateRandomNumber,
+    generateTempToken,
     generateUUID,
     encryption,
     decryption,

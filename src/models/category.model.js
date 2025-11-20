@@ -1,6 +1,6 @@
 const mongoose = require('mongoose')
 
-const categoryModelSchema = mongoose.Schema({
+const categoryModelSchema = new mongoose.Schema({
     name:{
         type:String,
         unique:true,

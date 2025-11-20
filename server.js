@@ -9,6 +9,8 @@ const userRoute = require('./src/routes/user.route')
 const categoryRoute = require('./src/routes/category.route')
 const unitRoute = require('./src/routes/unit.route')
 const productRoute = require('./src/routes/product.route')
+const roleRoute = require('./src/routes/role.route')
+const {connectRedis,setCache,getCache} =require('./src/config/redisClient')
 
 app.use(express.json())
 app.use(cors(
@@ -28,5 +30,12 @@ app.use("/api/v1/user",userRoute)
 app.use("/api/v1/category",categoryRoute)
 app.use("/api/v1/unit",unitRoute)
 app.use("/api/v1/product",productRoute)
+app.use("/api/v1/role",roleRoute)
 
-mongoose.connect(mongodb_url).then(()=>console.log("Mongo DB is connected")).catch((error)=>console.log('error connecting db:',error))
+mongoose.connect(mongodb_url).then(()=>{
+    console.log("Mongo DB is connected")
+    connectRedis().then(()=>{
+        console.log("Redis Connected Successfully")
+    })
+}
+).catch((error)=>console.log('error connecting db:',error)) 

@@ -5,11 +5,6 @@ const unitModelSchema = mongoose.Schema({
         type: String,
         required: true,
         unique: true
-    },
-    multiplier:{
-        type:Number,
-        required: true,
-        default: 1
     }
 })
 
