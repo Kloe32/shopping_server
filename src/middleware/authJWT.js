@@ -15,9 +15,6 @@ const verifyToken= (req,res,next)=>{
         req.name = decoded.name
         req.email = decoded.email
         req.role = decoded.role
-        if(req.role !=='superadmin'){
-            return res.status(401).send({message:"You are not authorized user!",success:false})
-        }
         next()
     })
 }

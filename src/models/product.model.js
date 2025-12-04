@@ -2,6 +2,10 @@ const mongoose =require('mongoose')
 const categoryModel = require('./category.model')
 const unitModel = require('./unit.model')
 const productModelSchema = new mongoose.Schema({
+    imageUrl:{
+        type:String,
+        required:false
+    },
     name:{
         type: String,
         required: true,

@@ -20,15 +20,10 @@ const userModelSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    role: {
+    role:{
         type:mongoose.Schema.Types.ObjectId,
         ref:'role',
-        required:true 
-    },
-    allowedRoutes:{
-        type:[String],
-        required:true,
-        unique:false,
+        required:false 
     },
     emailVerificationToken: {
       type: String,

@@ -27,7 +27,7 @@ const registerUser = async (req,res) =>{
         })
         const createdUser = await userModel.findById(response._id).select(
             "-password -emailVerificationToken -emailVerificationExpiry",
-        );
+        ).populate('role');
         if (!createdUser) {
             throw new ApiError(500, "Something went wrong while registering user.");
         }
@@ -127,7 +127,7 @@ const getAllAdmin = async (req,res) =>{
 const loginUser = async (req,res) =>{
     try{
         const {email,password} = req.body
-        const foundUser = await userModel.findOne({email: email}).populate("role")
+        const foundUser = await userModel.findOne({email: email})
         
         if (!foundUser){
             return res.status(404).json({message: "User Do Not Exist."})
@@ -135,7 +135,7 @@ const loginUser = async (req,res) =>{
         if (!comparison(password,foundUser.password)){
             return res.status(403).json({message:"Wrong Password."})
         }
-        const response = await userModel.findById(foundUser._id).select("-password")
+        const response = await userModel.findById(foundUser._id).select("-password").populate("role")
         return res.status(200).json({
             data: response,
             token: createToken({name:foundUser.name, email:foundUser.email, role:foundUser.role}),
@@ -169,11 +169,11 @@ const updateUser = async (req,res)=>{
         clearCache(config.REDIS_ADMIN_KEY)  
         const updatedUser = await userModel
             .findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true })
-            .select("-password");
-        res.status(200).json({message: "Updated", data:updatedUser}) 
-    } catch (error) {
+            .select("-password").populate('role');
+        res.status(200).json({message: "Updated", data:updatedUser, success:true}) 
+    } catch (error){
         console.log(error)
-        res.status(500).json({message:'Internal Server Error'})
+        res.status(500).json({message:'Internal Server Error',success:false})
     }
 }
 
@@ -187,7 +187,7 @@ const deleteUser = async (req,res)=>{
             return res.status(400).json({error:"User Deletion failed."})
         }
         clearCache(config.REDIS_USER_KEY)
-        return res.status(200).json({message:"user successfully deleted."})
+        return res.status(200).json({message:"user successfully deleted.",success:true})
     } catch (error){
         console.log(error)
         res.status(500).json({message: 'Internal Server Error'})
