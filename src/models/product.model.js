@@ -16,21 +16,10 @@ const productModelSchema = new mongoose.Schema({
         required:false,
         trim:true
     },
-    shortDescription:{
-        type:String,
-        trim:true,
-        maxlength:200,
-        required:false  
-    },
     brand:{
         type:String,
         required:true,
         trim:true
-    },
-    model: {
-        type: String,
-        required: true,
-        trim: true
     },
     variant:{
         type:[Object],

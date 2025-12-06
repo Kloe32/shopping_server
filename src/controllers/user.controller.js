@@ -110,7 +110,8 @@ const getAllAdmin = async (req,res) =>{
         const users = await userModel.find().populate('role')
         const admins = users.filter((u) =>
             u.role.name.toLowerCase() === "admin" ||
-            u.role.name.toLowerCase() === "guest"
+            u.role.name.toLowerCase() === "guest" ||
+            u.role.name.toLowerCase() === "sale manager"
         )
         await setCache(config.REDIS_ADMIN_KEY,admins)
         res.status(200).json({
@@ -160,7 +161,7 @@ const updateUser = async (req,res)=>{
         }
 
         if (req.file) {
-            const imageUrl = await uploadFile(req.file);
+            const imageUrl = await uploadFile(req.file,config.PROFILE_BUCKET);
             if (imageUrl) {
             updates.imageUrl = imageUrl;
             }

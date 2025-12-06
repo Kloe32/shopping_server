@@ -20,7 +20,9 @@ const config = {
     REDIS_TTL:process.env.REDIS_TTL,
     EXCHANGE_RATE_URL: process.env.EXCHANGE_RATE_URL,
     EXCHANGE_RATE_API_KEY: process.env.EXCHANGE_RATE_API_KEY,
-    JWT_TTL:process.env.JWT_TTL
+    JWT_TTL:process.env.JWT_TTL,
+    PROFILE_BUCKET:process.env.PROFILE_BUCKET,
+    PRODUCT_IMAGE_BUCKET:process.env.PRODUCT_IMAGE_BUCKET,
 }
 
 module.exports = config

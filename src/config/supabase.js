@@ -5,10 +5,10 @@ const multer = require("multer")
 const supabaseClient = createClient(config.PROJECT_URL,config.SUPABASE_SERVICE_ROLE)
 const upload = multer({storage:multer.memoryStorage()})
 
-const uploadFile = async (file) => {
+const uploadFile = async (file,bucket = "user-profile") => {
     try {
         const fileName = `${Date.now()}-${file.originalname}`
-        const fileStorage = supabaseClient.storage.from("user-profile")
+        const fileStorage = supabaseClient.storage.from(bucket)
         const {data, error} = await fileStorage.upload(fileName,file.buffer,{
             contentType : file.mimetype,
             upsert:true            
