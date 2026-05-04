@@ -1,29 +1,60 @@
-const mongoose =require('mongoose')
-const {encryption} = require("../helper/encryptDecrypt")
-const userModelSchema = new mongoose.Schema({
-    imageUrl:{
-        type:String,
-        required:false
-    },
-    name:{
-        type: String,
-        required: true,
-    },
+import mongoose from "mongoose";
+import { encryption } from "../helper/encryptDecrypt.js";
 
-    email:{
-        type: String,
-        required: true,    
-        unique:true,
-        default:''
+const AddressSchema = new mongoose.Schema({
+  street: String,
+  city: String,
+  state: String,
+  zipCode: String,
+  country: String,
+  isDefault: { type: Boolean, default: false },
+});
+
+const userModelSchema = new mongoose.Schema(
+  {
+    avatar: {
+      type: String,
+      required: false,
+      default: null,
     },
-    password:{
-        type: String,
-        required: true
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
     },
-    role:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'role',
-        required:false 
+    password: {
+      type: String,
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ["ADMIN", "CUSTOMER"],
+      default: "CUSTOMER",
+    },
+    profile: {
+      firstName: { type: String, trim: true },
+      lastName: { type: String, trim: true },
+      phone: { type: String, trim: true, required: false },
+    },
+    addresses: [AddressSchema],
+    isGuest: {
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ["ACTIVE", "INACTIVE", "BANNED"],
+      default: "ACTIVE",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
     emailVerificationToken: {
       type: String,
@@ -31,22 +62,21 @@ const userModelSchema = new mongoose.Schema({
     emailVerificationExpiry: {
       type: Date,
     },
-    isEmailVerified:{
-        type:Boolean,
-        default:false
-    }
-
-},{
-    timestamps:true
-})
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
 
 //pre hook for encryption
 userModelSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-
   this.password = encryption(this.password);
   next();
 });
 
-
-module.exports = mongoose.model('user',userModelSchema)
+export default mongoose.model("user", userModelSchema);

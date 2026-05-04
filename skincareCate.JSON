@@ -1,0 +1,110 @@
+{
+  "categories": [
+    {
+      "name": "Skincare",
+      "description": "Face and skin treatments focused on hydration, protection, and repair.",
+      "children": [
+        { "name": "Cleansers", "description": "Gel, foam, and oil-based facial cleansers." },
+        { "name": "Toners & Essences", "description": "Hydrating and balancing liquid treatments." },
+        { "name": "Serums & Treatments", "description": "Concentrated solutions for targeted skin concerns." },
+        { "name": "Moisturisers", "description": "Day and night creams for skin hydration." },
+        { "name": "Sunscreens", "description": "SPF-based protection against UV damage." },
+        { "name": "Face Masks", "description": "Sheet, clay, and overnight masks." },
+        { "name": "Eye Care", "description": "Products for under-eye hydration and treatment." },
+        { "name": "Lip Care", "description": "Balms and treatments for lips." }
+      ]
+    },
+    {
+      "name": "Hair Care",
+      "description": "Products designed for hair health, styling, and scalp care.",
+      "children": [
+        { "name": "Shampoo", "description": "Cleansing solutions for different hair types." },
+        { "name": "Conditioner", "description": "Moisturising and smoothing treatments." },
+        { "name": "Hair Treatments", "description": "Masks, oils, and serums for repair." },
+        { "name": "Styling Products", "description": "Hair sprays, gels, and waxes." },
+        { "name": "Scalp Care", "description": "Products targeting scalp health." }
+      ]
+    },
+    {
+      "name": "Body Care",
+      "description": "Products for full body hygiene and nourishment.",
+      "children": [
+        { "name": "Body Wash & Shower Gel", "description": "Cleansing products for the body." },
+        { "name": "Body Lotion & Cream", "description": "Hydration and nourishment for skin." },
+        { "name": "Body Scrubs & Exfoliators", "description": "Exfoliating treatments." },
+        { "name": "Hand & Foot Care", "description": "Specialised care products." },
+        { "name": "Deodorants", "description": "Odour control and freshness." }
+      ]
+    },
+    {
+      "name": "Cosmetics",
+      "description": "Makeup products for enhancing facial features.",
+      "children": [
+        { "name": "Face Makeup", "description": "Foundation, concealer, and powders." },
+        { "name": "Eye Makeup", "description": "Mascara, eyeliner, and eyeshadow." },
+        { "name": "Lip Makeup", "description": "Lipstick, gloss, and balm." },
+        { "name": "Cheek Makeup", "description": "Blush, bronzer, and highlighter." },
+        { "name": "Makeup Tools", "description": "Brushes, sponges, and applicators." }
+      ]
+    },
+    {
+      "name": "Health & Wellness",
+      "description": "Products supporting internal health and relaxation.",
+      "children": [
+        { "name": "Supplements", "description": "Vitamins and nutritional products." },
+        { "name": "Essential Oils", "description": "Natural oils for therapy and care." },
+        { "name": "Aromatherapy", "description": "Relaxation and stress relief products." },
+        { "name": "Stress Relief", "description": "Products promoting relaxation and wellness." }
+      ]
+    },
+    {
+      "name": "Personal Care",
+      "description": "Daily hygiene and grooming products.",
+      "children": [
+        { "name": "Oral Care", "description": "Toothpaste and mouthwash." },
+        { "name": "Feminine Hygiene", "description": "Products for women's hygiene." },
+        { "name": "Grooming", "description": "Shaving and trimming products." },
+        { "name": "Hand Sanitizers", "description": "Alcohol-based hygiene products." }
+      ]
+    },
+    {
+      "name": "Fragrance",
+      "description": "Scent-based personal products.",
+      "children": [
+        { "name": "Perfumes", "description": "Fragrances for men, women, and unisex." },
+        { "name": "Body Mists", "description": "Light fragrance sprays." },
+        { "name": "Roll-on Fragrances", "description": "Portable fragrance solutions." }
+      ]
+    },
+    {
+      "name": "Men’s Care",
+      "description": "Products tailored for men's grooming needs.",
+      "children": [
+        { "name": "Men Skincare", "description": "Facial care products for men." },
+        { "name": "Beard Care", "description": "Oils and grooming tools." },
+        { "name": "Hair Styling", "description": "Styling products for men." },
+        { "name": "Grooming Kits", "description": "Complete grooming sets." }
+      ]
+    },
+    {
+      "name": "Bundles & Gift Sets",
+      "description": "Curated product collections for value and gifting.",
+      "children": [
+        { "name": "Skincare Sets", "description": "Grouped skincare routines." },
+        { "name": "Hair Care Sets", "description": "Hair treatment bundles." },
+        { "name": "Wellness Kits", "description": "Relaxation and health kits." },
+        { "name": "Seasonal Gifts", "description": "Limited-time gift packages." }
+      ]
+    },
+    {
+      "name": "Clean & Sustainable Beauty",
+      "description": "Eco-friendly and ethical beauty products.",
+      "children": [
+        { "name": "Organic Products", "description": "Natural and organic ingredients." },
+        { "name": "Vegan Products", "description": "No animal-derived ingredients." },
+        { "name": "Cruelty-Free", "description": "Not tested on animals." },
+        { "name": "Eco Packaging", "description": "Sustainable packaging solutions." }
+      ]
+    }
+  ]
+}

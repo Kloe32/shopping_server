@@ -1,13 +1,21 @@
-const express = require('express')
-const router = express.Router()
-const {getAllCategory, createCategory, deleteCategory, updateCategory, getCategorybyName, updateCategoryByName} = require('../controllers/category.controller')
-const { verifyToken } = require('../middleware/authJWT')
+import express from "express";
+const router = express.Router();
+import { upload } from "../config/supabase.js";
+import {
+  getAllCategory,
+  createCategory,
+  deleteCategory,
+  updateCategory,
+  getCategorybyName,
+  updateCategoryByName,
+} from "../controllers/category.controller.js";
+import { verifyToken } from "../middleware/authJWT.js";
 
-router.get('/',getAllCategory)
-router.post('/',verifyToken,createCategory)
-router.delete('/:id',verifyToken,deleteCategory)
-router.put('/:id',verifyToken,updateCategory)
-router.get('/name',getCategorybyName)
-router.put('/name/:name',verifyToken,updateCategoryByName)
+// router.get("/", getAllCategory);
+router.post("/add", upload.single("file"), createCategory);
+// router.delete("/:id", verifyToken, deleteCategory);
+// router.put("/:id", updateCategory);
+// router.get("/name", getCategorybyName);
+// router.put("/name/:name", verifyToken, updateCategoryByName);
 
-module.exports = router
+export default router;

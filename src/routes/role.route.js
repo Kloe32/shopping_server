@@ -1,10 +1,14 @@
-const express = require('express')
-const router = express.Router()
-const {createRole,getAllRole,deleteRole} =require('../controllers/role.controller')
-const { verifyToken } = require('../middleware/authJWT')
+// import express from "express";
+// const router = express.Router();
+// import {
+//   createRole,
+//   getAllRole,
+//   deleteRole,
+// } from "../controllers/role.controller.js";
+// import { verifyToken } from "../middleware/authJWT.js";
 
-router.get("/",getAllRole)
-router.post("/",createRole)
-router.delete('/:id',deleteRole)
+// router.get("/", getAllRole);
+// router.post("/", createRole);
+// router.delete("/:id", deleteRole);
 
-module.exports = router
+// export default router;

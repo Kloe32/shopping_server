@@ -1,48 +1,34 @@
-const nodemailer = require("nodemailer")
-const Mailgen = require("mailgen")
-const config = require("../config/config")
+import Mailgen from "mailgen";
+import config from "../config/config.js";
 
-const sendEmail = async (options)=>{
-    const mailGenerator = new Mailgen({
-        theme:"default",
-        product:{
-            name: "electroCart",
-            link:"https://google.com"
-        }
-    })
+import { Resend } from "resend";
 
-    const emailTextual = mailGenerator.generatePlaintext(options.mailContent);
-    const emailHtml = mailGenerator.generate(options.mailContent);
+const sendEmail = async (options) => {
+  const mailGenerator = new Mailgen({
+    theme: "default",
+    product: {
+      name: "Amberis",
+      link: "https://google.com",
+    },
+  });
 
+  // const emailTextual = mailGenerator.generatePlaintext(options.mailContent);
+  const emailHtml = mailGenerator.generate(options.mailContent);
 
-    const transporter = nodemailer.createTransport({
-        service:"gmail",
-        auth:{
-            user: config.MAIL_SMTP_USER,
-            pass:config.MAIL_SMTP_PASS
-        }
-    })
-
-    const mail = {
-        from: "test.@gmail.com",
-        to:options.email,
-        subject:options.subject,
-        text:emailTextual,
-        html:emailHtml
-    }
-
-    try {
-        await transporter.sendMail(mail)
-    } catch (error) {
-    console.error(
-      "Email service failed silently, make sure you provide mailtrap credentials in the .env",
-    ); 
+  const resend = new Resend(config.RESEND_API_KEY);
+  try {
+    const { data } = await resend.emails.send({
+      from: "Acme <onboarding@resend.dev>",
+      to: [options.email],
+      subject: options.subject,
+      html: emailHtml,
+    });
+    console.log("email sent successfully", data);
+  } catch (error) {
+    console.error("Email failed to send");
     console.log("error", error);
-    }
-}
-
-
-
+  }
+};
 
 const emailVerificationContent = (username, verificationUrl) => {
   return {
@@ -64,8 +50,4 @@ const emailVerificationContent = (username, verificationUrl) => {
   };
 };
 
-
-module.exports = {
-    sendEmail,
-    emailVerificationContent
-}
+export { sendEmail, emailVerificationContent };
