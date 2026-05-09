@@ -117,24 +117,24 @@ const getAllUsers = async (req, res) => {
 
 const getAllAdmin = async (req, res) => {
   try {
-    clearCache(config.REDIS_ADMIN_KEY);
-    const cachedData = await getCache(config.REDIS_ADMIN_KEY);
-    if (cachedData) {
-      const jsonData = JSON.parse(cachedData);
-      return res.status(200).json({
-        success: true,
-        message: `Total ${jsonData.length} admins fetched!`,
-        data: jsonData,
-      });
-    }
-    const users = await userModel.find().populate("role");
-    const admins = users.filter(
-      (u) =>
-        u.role.name.toLowerCase() === "admin" ||
-        u.role.name.toLowerCase() === "guest" ||
-        u.role.name.toLowerCase() === "sale manager",
-    );
-    await setCache(config.REDIS_ADMIN_KEY, admins);
+    // clearCache(config.REDIS_ADMIN_KEY);
+    // const cachedData = await getCache(config.REDIS_ADMIN_KEY);
+    // if (cachedData) {
+    //   const jsonData = JSON.parse(cachedData);
+    //   return res.status(200).json({
+    //     success: true,
+    //     message: `Total ${jsonData.length} admins fetched!`,
+    //     data: jsonData,
+    //   });
+    // }
+    const users = await userModel
+      .find()
+      .select(
+        "-password -emailVerificationToken -emailVerificationExpiry -isEmailVerified ",
+      );
+    const admins = users.filter((u) => u.role.toLowerCase() === "admin");
+      
+    // await setCache(config.REDIS_ADMIN_KEY, admins);
     res.status(200).json({
       success: true,
       message: `${admins.length} Admins Fetched Successfully`,
@@ -159,14 +159,16 @@ const loginUser = async (req, res) => {
     }
     const response = await userModel
       .findById(foundUser._id)
-      .select("-password")
-      .populate("role");
+      .select(
+        "-password -emailVerificationToken -emailVerificationExpiry -isEmailVerified",
+      );
     return res.status(200).json({
-      data: response,
+      user: response,
       token: createToken({
         name: foundUser.name,
         email: foundUser.email,
         role: foundUser.role,
+        admin_role: foundUser.admin_role,
       }),
       message: "Login Successful!",
       success: true,

@@ -1,9 +1,15 @@
 import { body } from "express-validator";
 
 const registerValidator = [
-  body("name")
+  body("firstName")
     .notEmpty()
-    .withMessage("Name is required")
+    .withMessage("FirstName is required")
+    .isLength({ min: 2 })
+    .withMessage("Name must be at least 2 characters"),
+
+  body("lastName")
+    .notEmpty()
+    .withMessage("Last Name is required")
     .isLength({ min: 2 })
     .withMessage("Name must be at least 2 characters"),
 
@@ -27,4 +33,4 @@ const loginValidator = [
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
-module.exports = { registerValidator, loginValidator };
+export { registerValidator, loginValidator };

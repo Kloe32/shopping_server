@@ -33,6 +33,10 @@ const userModelSchema = new mongoose.Schema(
       enum: ["ADMIN", "CUSTOMER"],
       default: "CUSTOMER",
     },
+    admin_role: {
+      type: String,
+      enum: ["SUPER_ADMIN", "PRODUCT_MANAGER", "CUSTOMER_SUPPORT"],
+    },
     profile: {
       firstName: { type: String, trim: true },
       lastName: { type: String, trim: true },

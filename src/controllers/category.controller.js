@@ -14,6 +14,7 @@ const getAllCategory = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 const getCategorybyName = async (req, res) => {
   try {
     const name = req.params.name;
@@ -65,6 +66,15 @@ const createCategory = async (req, res) => {
 const deleteCategory = async (req, res) => {
   try {
     const id = req.params.id;
+
+    const hasChildern = await categoryModel.exists({ parentCategory: id });
+    if (hasChildern) {
+      return res.status(403).json({
+        message:
+          "Cannot delete category with subcategories. Please delete subcategories first.",
+        success: false,
+      });
+    }
     const deletedCategory = await categoryModel.findByIdAndDelete(id);
     if (!deletedCategory) {
       res.status(403).json({ message: "Fail to Delete" });
@@ -80,8 +90,14 @@ const deleteCategory = async (req, res) => {
   }
 };
 const updateCategory = async (req, res) => {
+  let imageUrl = "";
   try {
     const id = req.params.id;
+    if (req.file) {
+      imageUrl = await uploadFile(req.file, config.PRODUCT_IMAGE_BUCKET);
+      req.body.image = imageUrl;
+    }
+
     const updatedCategory = await categoryModel.findByIdAndUpdate(
       id,
       req.body,
@@ -100,23 +116,13 @@ const updateCategory = async (req, res) => {
       success: true,
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-};
-const updateCategoryByName = async (req, res) => {
-  try {
-    const name = req.params.name;
-    const updatedCategory = await categoryModel.findOneAndUpdate(
-      { name },
-      req.body,
-      { new: true },
-    );
-    if (!updatedCategory) {
-      res.status(403).json({ message: "Fail to Update" });
+    try {
+      imageUrl && (await deleteFile(imageUrl, config.PRODUCT_IMAGE_BUCKET));
+    } catch (error) {
+      throw new Error(
+        "Error deleting uploaded image after update failure: " + error,
+      );
     }
-    res.status(200).json({ updatedCategory });
-  } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Internal Server Error" });
   }
@@ -128,5 +134,4 @@ export {
   deleteCategory,
   updateCategory,
   getCategorybyName,
-  updateCategoryByName,
 };

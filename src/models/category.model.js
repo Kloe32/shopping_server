@@ -27,6 +27,11 @@ const categoryModelSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    status: {
+      type: String,
+      default: "ACTIVE",
+      enum: ["ACTIVE", "INACTIVE"],
+    },
   },
   {
     timestamps: true,
