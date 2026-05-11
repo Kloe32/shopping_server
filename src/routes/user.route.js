@@ -21,7 +21,6 @@ router.post("/create", registerValidator, validate, registerUser);
 
 // router.get('/',getAllUsers)
 router.get("/get-admins", getAllAdmin);
-// router.post('/CreateUser',registerUser)
 router.post("/login", loginValidator, validate, loginUser);
 // router.put('/UpdateUser/:id',upload.single("file"),updateUser)
 // router.delete('/DeleteUser/:id',deleteUser)

@@ -1,7 +1,7 @@
 import { uploadFile, deleteFile } from "../config/supabase.js";
 import categoryModel from "../models/category.model.js";
 import config from "../config/config.js";
-const getAllCategory = async (req, res) => {
+const getCategory = async (req, res) => {
   try {
     const categories = await categoryModel.find();
     return res.status(200).json({
@@ -79,6 +79,17 @@ const deleteCategory = async (req, res) => {
     if (!deletedCategory) {
       res.status(403).json({ message: "Fail to Delete" });
     }
+    const imageUrl = deletedCategory.image;
+    if (imageUrl) {
+      try {
+        await deleteFile(imageUrl, config.PRODUCT_IMAGE_BUCKET);
+      } catch (error) {
+        return console.log(
+          "Error deleting category image from storage after category deletion: ",
+          error,
+        );
+      }
+    }
     res.status(200).json({
       message: `${deletedCategory.name} has been deleted!`,
       data: deletedCategory,
@@ -129,7 +140,7 @@ const updateCategory = async (req, res) => {
 };
 
 export {
-  getAllCategory,
+  getCategory,
   createCategory,
   deleteCategory,
   updateCategory,
