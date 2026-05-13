@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import config from "../config/config.js";
 import orderModel from "../models/order.model.js";
 import productModel from "../models/product.model.js";
 import productVariantModel from "../models/productVariant.model.js";
@@ -33,6 +34,22 @@ const toMoneyNumber = (value, fallback = 0) => {
 };
 
 const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
+const getTaxRate = () => {
+  const taxRate = Number(config.ORDER_TAX_RATE);
+  if (!Number.isFinite(taxRate) || taxRate < 0) return 0;
+  return taxRate > 1 ? taxRate / 100 : taxRate;
+};
+
+const calculateTax = (subtotal) => roundMoney(subtotal * getTaxRate());
+
+const calculateOrderTotal = ({ subtotal, shippingCost }) => {
+  const tax = calculateTax(subtotal);
+  return {
+    tax,
+    total: roundMoney(subtotal + tax + shippingCost),
+  };
+};
 
 const generateOrderNumber = async () => {
   for (let index = 0; index < 5; index += 1) {
@@ -231,9 +248,8 @@ const createOrder = async (req, res) => {
     const subtotal = roundMoney(
       orderItems.reduce((total, item) => total + item.price * item.quantity, 0),
     );
-    const tax = toMoneyNumber(req.body.tax);
     const shippingCost = toMoneyNumber(req.body.shippingCost);
-    const total = roundMoney(subtotal + tax + shippingCost);
+    const { tax, total } = calculateOrderTotal({ subtotal, shippingCost });
     const paymentStatus = req.body.paymentInfo?.status
       ? String(req.body.paymentInfo.status).toUpperCase()
       : "PENDING";
@@ -377,7 +393,6 @@ const updateOrder = async (req, res) => {
 
     const allowedUpdates = {};
     if (req.body.shippingAddress) allowedUpdates.shippingAddress = req.body.shippingAddress;
-    if (req.body.tax !== undefined) allowedUpdates.tax = toMoneyNumber(req.body.tax);
     if (req.body.shippingCost !== undefined) {
       allowedUpdates.shippingCost = toMoneyNumber(req.body.shippingCost);
     }
@@ -393,9 +408,13 @@ const updateOrder = async (req, res) => {
       });
     }
 
-    const nextTax = allowedUpdates.tax ?? order.tax;
     const nextShippingCost = allowedUpdates.shippingCost ?? order.shippingCost;
-    allowedUpdates.total = roundMoney(order.subtotal + nextTax + nextShippingCost);
+    const { tax, total } = calculateOrderTotal({
+      subtotal: order.subtotal,
+      shippingCost: nextShippingCost,
+    });
+    allowedUpdates.tax = tax;
+    allowedUpdates.total = total;
 
     const updatedOrder = await populateOrder(
       orderModel.findByIdAndUpdate(req.params.id, allowedUpdates, {

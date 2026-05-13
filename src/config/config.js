@@ -24,6 +24,7 @@ const config = {
   PROFILE_BUCKET: process.env.PROFILE_BUCKET,
   PRODUCT_IMAGE_BUCKET: process.env.PRODUCT_IMAGE_BUCKET,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
+  ORDER_TAX_RATE: process.env.ORDER_TAX_RATE || 0,
 };
 
 export default config;
