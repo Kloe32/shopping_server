@@ -8,9 +8,28 @@ const supabaseClient = createClient(
 );
 const upload = multer({ storage: multer.memoryStorage() });
 
+const sanitizeFileName = (originalName) => {
+  if (!originalName) return "file";
+  const lastDotIndex = originalName.lastIndexOf(".");
+  const baseName =
+    lastDotIndex > 0 ? originalName.slice(0, lastDotIndex) : originalName;
+  const extension =
+    lastDotIndex > 0 ? originalName.slice(lastDotIndex).toLowerCase() : "";
+
+  const sanitizedBase = baseName
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+  return `${sanitizedBase || "file"}${extension}`;
+};
+
 const uploadFile = async (file, bucket = "image-storage") => {
   try {
-    const fileName = `${Date.now()}-${file.originalname}`;
+    const safeName = sanitizeFileName(file.originalname);
+    const fileName = `${Date.now()}-${safeName}`;
     const fileStorage = supabaseClient.storage.from(bucket);
     const { data, error } = await fileStorage.upload(fileName, file.buffer, {
       contentType: file.mimetype,

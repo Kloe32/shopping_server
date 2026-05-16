@@ -19,7 +19,10 @@ const populateOrder = (query) =>
   query
     .populate("user", "email profile phone role")
     .populate("items.product", "name slug images basePrice stock status")
-    .populate("items.variant", "sku attributes priceAdjustment inventoryCount images");
+    .populate(
+      "items.variant",
+      "sku attributes priceAdjustment inventoryCount images",
+    );
 
 const isAdminRequest = (req) => req.role === "ADMIN";
 
@@ -30,10 +33,13 @@ const getAuthUser = async (req) => {
 
 const toMoneyNumber = (value, fallback = 0) => {
   const numberValue = Number(value);
-  return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : fallback;
+  return Number.isFinite(numberValue) && numberValue >= 0
+    ? numberValue
+    : fallback;
 };
 
-const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const roundMoney = (value) =>
+  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 const getTaxRate = () => {
   const taxRate = Number(config.ORDER_TAX_RATE);
@@ -117,13 +123,18 @@ const buildOrderItems = async (items = []) => {
         return { error: `${product.name} variant was not found.` };
       }
       if (variant.inventoryCount < quantity) {
-        return { error: `${product.name}${formatVariantName(variant)} does not have enough inventory.` };
+        return {
+          error: `${product.name}${formatVariantName(variant)} does not have enough inventory.`,
+        };
       }
     }
 
     const discountedPrice =
-      product.basePrice - (product.basePrice * (product.discountPercentage || 0)) / 100;
-    const unitPrice = roundMoney(discountedPrice + (variant?.priceAdjustment || 0));
+      product.basePrice -
+      (product.basePrice * (product.discountPercentage || 0)) / 100;
+    const unitPrice = roundMoney(
+      discountedPrice + (variant?.priceAdjustment || 0),
+    );
 
     orderItems.push({
       product: product._id,
@@ -149,7 +160,11 @@ const decrementInventory = async (items) => {
       if (productUpdate.modifiedCount !== 1) {
         throw new Error(`${item.name} does not have enough stock.`);
       }
-      rollbackItems.push({ type: "product", id: item.product, quantity: item.quantity });
+      rollbackItems.push({
+        type: "product",
+        id: item.product,
+        quantity: item.quantity,
+      });
 
       if (item.variant) {
         const variantUpdate = await productVariantModel.updateOne(
@@ -163,7 +178,11 @@ const decrementInventory = async (items) => {
         if (variantUpdate.modifiedCount !== 1) {
           throw new Error(`${item.name} does not have enough inventory.`);
         }
-        rollbackItems.push({ type: "variant", id: item.variant, quantity: item.quantity });
+        rollbackItems.push({
+          type: "variant",
+          id: item.variant,
+          quantity: item.quantity,
+        });
       }
     }
   } catch (error) {
@@ -175,7 +194,10 @@ const decrementInventory = async (items) => {
 const restoreInventory = async (items = []) => {
   for (const item of items) {
     if (item.type === "product") {
-      await productModel.updateOne({ _id: item.id }, { $inc: { stock: item.quantity } });
+      await productModel.updateOne(
+        { _id: item.id },
+        { $inc: { stock: item.quantity } },
+      );
     }
     if (item.type === "variant") {
       await productVariantModel.updateOne(
@@ -189,9 +211,17 @@ const restoreInventory = async (items = []) => {
 const restoreOrderInventory = async (order) => {
   const inventoryItems = [];
   for (const item of order.items) {
-    inventoryItems.push({ type: "product", id: item.product, quantity: item.quantity });
+    inventoryItems.push({
+      type: "product",
+      id: item.product,
+      quantity: item.quantity,
+    });
     if (item.variant) {
-      inventoryItems.push({ type: "variant", id: item.variant, quantity: item.quantity });
+      inventoryItems.push({
+        type: "variant",
+        id: item.variant,
+        quantity: item.quantity,
+      });
     }
   }
   await restoreInventory(inventoryItems);
@@ -200,11 +230,13 @@ const restoreOrderInventory = async (order) => {
 const buildOrderFilter = (query = {}) => {
   const filter = {};
   if (query.status) filter.status = String(query.status).toUpperCase();
-  if (query.paymentStatus) filter["paymentInfo.status"] = String(query.paymentStatus).toUpperCase();
+  if (query.paymentStatus)
+    filter["paymentInfo.status"] = String(query.paymentStatus).toUpperCase();
   if (query.user && mongoose.isValidObjectId(query.user)) {
     filter.user = new mongoose.Types.ObjectId(query.user);
   }
-  if (query.orderNumber) filter.orderNumber = { $regex: query.orderNumber, $options: "i" };
+  if (query.orderNumber)
+    filter.orderNumber = { $regex: query.orderNumber, $options: "i" };
 
   if (query.fromDate || query.toDate) {
     filter.createdAt = {};
@@ -218,7 +250,9 @@ const buildOrderFilter = (query = {}) => {
 const createOrder = async (req, res) => {
   let orderItems = [];
   try {
-    const { error, orderItems: preparedItems } = await buildOrderItems(req.body.items);
+    const { error, orderItems: preparedItems } = await buildOrderItems(
+      req.body.items,
+    );
     if (error) {
       return res.status(400).json({ message: error, success: false });
     }
@@ -236,12 +270,19 @@ const createOrder = async (req, res) => {
       });
     }
     if (user && !mongoose.isValidObjectId(user)) {
-      return res.status(400).json({ message: "Invalid user id.", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid user id.", success: false });
     }
     if (user) {
-      const existingUser = await userModel.exists({ _id: user, isDeleted: false });
+      const existingUser = await userModel.exists({
+        _id: user,
+        isDeleted: false,
+      });
       if (!existingUser) {
-        return res.status(404).json({ message: "User not found.", success: false });
+        return res
+          .status(404)
+          .json({ message: "User not found.", success: false });
       }
     }
 
@@ -280,7 +321,9 @@ const createOrder = async (req, res) => {
         total,
       });
 
-      const response = await populateOrder(orderModel.findById(createdOrder._id));
+      const response = await populateOrder(
+        orderModel.findById(createdOrder._id),
+      );
       return res.status(201).json({
         message: "Order created successfully.",
         data: response,
@@ -302,7 +345,9 @@ const createOrder = async (req, res) => {
 const getAllOrders = async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ message: "Admin access required.", success: false });
+      return res
+        .status(403)
+        .json({ message: "Admin access required.", success: false });
     }
 
     const page = Math.max(Number(req.query.page) || 1, 1);
@@ -311,7 +356,9 @@ const getAllOrders = async (req, res) => {
     const filter = buildOrderFilter(req.query);
 
     const [orders, totalOrders] = await Promise.all([
-      populateOrder(orderModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)),
+      populateOrder(
+        orderModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      ),
       orderModel.countDocuments(filter),
     ]);
 
@@ -328,7 +375,9 @@ const getAllOrders = async (req, res) => {
     });
   } catch (error) {
     console.log("Get All Orders Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
@@ -336,11 +385,15 @@ const getMyOrders = async (req, res) => {
   try {
     const authUser = await getAuthUser(req);
     if (!authUser) {
-      return res.status(401).json({ message: "User not found.", success: false });
+      return res
+        .status(401)
+        .json({ message: "User not found.", success: false });
     }
 
     const filter = { ...buildOrderFilter(req.query), user: authUser._id };
-    const orders = await populateOrder(orderModel.find(filter).sort({ createdAt: -1 }));
+    const orders = await populateOrder(
+      orderModel.find(filter).sort({ createdAt: -1 }),
+    );
 
     return res.status(200).json({
       success: true,
@@ -349,25 +402,33 @@ const getMyOrders = async (req, res) => {
     });
   } catch (error) {
     console.log("Get My Orders Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
 const getOrderById = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid order id.", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
     }
 
     const order = await populateOrder(orderModel.findById(req.params.id));
     if (!order) {
-      return res.status(404).json({ message: "Order not found.", success: false });
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
     }
 
     if (!isAdminRequest(req)) {
       const authUser = await getAuthUser(req);
       if (!authUser || String(order.user?._id) !== String(authUser._id)) {
-        return res.status(403).json({ message: "You cannot access this order.", success: false });
+        return res
+          .status(403)
+          .json({ message: "You cannot access this order.", success: false });
       }
     }
 
@@ -378,28 +439,37 @@ const getOrderById = async (req, res) => {
     });
   } catch (error) {
     console.log("Get Order Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
 const updateOrder = async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ message: "Admin access required.", success: false });
+      return res
+        .status(403)
+        .json({ message: "Admin access required.", success: false });
     }
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid order id.", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
     }
 
     const allowedUpdates = {};
-    if (req.body.shippingAddress) allowedUpdates.shippingAddress = req.body.shippingAddress;
+    if (req.body.shippingAddress)
+      allowedUpdates.shippingAddress = req.body.shippingAddress;
     if (req.body.shippingCost !== undefined) {
       allowedUpdates.shippingCost = toMoneyNumber(req.body.shippingCost);
     }
 
     const order = await orderModel.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found.", success: false });
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
     }
     if (["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status)) {
       return res.status(400).json({
@@ -430,17 +500,23 @@ const updateOrder = async (req, res) => {
     });
   } catch (error) {
     console.log("Update Order Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
 const updateOrderStatus = async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ message: "Admin access required.", success: false });
+      return res
+        .status(403)
+        .json({ message: "Admin access required.", success: false });
     }
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid order id.", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
     }
 
     const status = String(req.body.status || "").toUpperCase();
@@ -453,7 +529,9 @@ const updateOrderStatus = async (req, res) => {
 
     const order = await orderModel.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found.", success: false });
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
     }
 
     const allowedNextStatuses = STATUS_TRANSITIONS[order.status] || [];
@@ -483,20 +561,28 @@ const updateOrderStatus = async (req, res) => {
     });
   } catch (error) {
     console.log("Update Order Status Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
 const updatePaymentInfo = async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ message: "Admin access required.", success: false });
+      return res
+        .status(403)
+        .json({ message: "Admin access required.", success: false });
     }
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid order id.", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
     }
 
-    const paymentStatus = req.body.status ? String(req.body.status).toUpperCase() : undefined;
+    const paymentStatus = req.body.status
+      ? String(req.body.status).toUpperCase()
+      : undefined;
     if (paymentStatus && !PAYMENT_STATUSES.includes(paymentStatus)) {
       return res.status(400).json({
         message: `Invalid payment status. Must be one of: ${PAYMENT_STATUSES.join(", ")}.`,
@@ -506,10 +592,13 @@ const updatePaymentInfo = async (req, res) => {
 
     const order = await orderModel.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found.", success: false });
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
     }
 
-    if (req.body.method !== undefined) order.paymentInfo.method = req.body.method;
+    if (req.body.method !== undefined)
+      order.paymentInfo.method = req.body.method;
     if (req.body.transactionId !== undefined) {
       order.paymentInfo.transactionId = req.body.transactionId;
     }
@@ -527,25 +616,33 @@ const updatePaymentInfo = async (req, res) => {
     });
   } catch (error) {
     console.log("Update Payment Info Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
 const cancelOrder = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid order id.", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
     }
 
     const order = await orderModel.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found.", success: false });
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
     }
 
     if (!isAdminRequest(req)) {
       const authUser = await getAuthUser(req);
       if (!authUser || String(order.user) !== String(authUser._id)) {
-        return res.status(403).json({ message: "You cannot cancel this order.", success: false });
+        return res
+          .status(403)
+          .json({ message: "You cannot cancel this order.", success: false });
       }
     }
 
@@ -558,7 +655,8 @@ const cancelOrder = async (req, res) => {
 
     await restoreOrderInventory(order);
     order.status = "CANCELLED";
-    if (order.paymentInfo.status === "PAID") order.paymentInfo.status = "REFUNDED";
+    if (order.paymentInfo.status === "PAID")
+      order.paymentInfo.status = "REFUNDED";
     await order.save();
 
     const updatedOrder = await populateOrder(orderModel.findById(order._id));
@@ -569,22 +667,30 @@ const cancelOrder = async (req, res) => {
     });
   } catch (error) {
     console.log("Cancel Order Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
 const deleteOrder = async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ message: "Admin access required.", success: false });
+      return res
+        .status(403)
+        .json({ message: "Admin access required.", success: false });
     }
     if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ message: "Invalid order id.", success: false });
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
     }
 
     const order = await orderModel.findById(req.params.id);
     if (!order) {
-      return res.status(404).json({ message: "Order not found.", success: false });
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
     }
     if (order.status !== "CANCELLED") {
       return res.status(400).json({
@@ -600,14 +706,18 @@ const deleteOrder = async (req, res) => {
     });
   } catch (error) {
     console.log("Delete Order Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
 const getOrderSummary = async (req, res) => {
   try {
     if (!isAdminRequest(req)) {
-      return res.status(403).json({ message: "Admin access required.", success: false });
+      return res
+        .status(403)
+        .json({ message: "Admin access required.", success: false });
     }
 
     const filter = buildOrderFilter(req.query);
@@ -646,7 +756,9 @@ const getOrderSummary = async (req, res) => {
     });
   } catch (error) {
     console.log("Get Order Summary Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", success: false });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
   }
 };
 
