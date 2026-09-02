@@ -25,6 +25,9 @@ const config = {
   PRODUCT_IMAGE_BUCKET: process.env.PRODUCT_IMAGE_BUCKET,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   ORDER_TAX_RATE: process.env.ORDER_TAX_RATE || 0,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || "",
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || "",
+  STRIPE_CURRENCY: process.env.STRIPE_CURRENCY || "usd",
 };
 
 export default config;

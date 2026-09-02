@@ -1,16 +1,31 @@
 import mongoose from "mongoose";
 import config from "../config/config.js";
+import {
+  constructWebhookEvent,
+  createPaymentIntent,
+  stripe,
+} from "../config/stripe.js";
 import orderModel from "../models/order.model.js";
 import productModel from "../models/product.model.js";
 import productVariantModel from "../models/productVariant.model.js";
 import userModel from "../models/user.model.js";
 
-const ORDER_STATUSES = ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"];
+const ORDER_STATUSES = [
+  "PENDING",
+  "PROCESSING",
+  "PAID",
+  "SHIPPED",
+  "DELIVERED",
+  "CANCELLED",
+];
+
 const PAYMENT_STATUSES = ["PENDING", "PAID", "FAILED", "REFUNDED"];
+
 const STATUS_TRANSITIONS = {
-  PENDING: ["PAID", "CANCELLED"],
-  PAID: ["SHIPPED", "CANCELLED"],
-  SHIPPED: ["DELIVERED"],
+  PENDING: ["PROCESSING", "PAID", "CANCELLED"],
+  PROCESSING: ["PAID", "SHIPPED", "CANCELLED"],
+  PAID: ["PROCESSING", "SHIPPED", "CANCELLED"],
+  SHIPPED: ["DELIVERED", "CANCELLED"],
   DELIVERED: [],
   CANCELLED: [],
 };
@@ -24,11 +39,14 @@ const populateOrder = (query) =>
       "sku attributes priceAdjustment inventoryCount images",
     );
 
-const isAdminRequest = (req) => req.role === "ADMIN";
+const isAdminRequest = (req) =>
+  req.role === "ADMIN" ||
+  req.role === "admin" ||
+  Boolean(req.admin_role);
 
 const getAuthUser = async (req) => {
   if (!req.email) return null;
-  return userModel.findOne({ email: req.email }).select("_id email role");
+  return userModel.findOne({ email: req.email }).select("_id email role admin_role");
 };
 
 const toMoneyNumber = (value, fallback = 0) => {
@@ -49,11 +67,12 @@ const getTaxRate = () => {
 
 const calculateTax = (subtotal) => roundMoney(subtotal * getTaxRate());
 
-const calculateOrderTotal = ({ subtotal, shippingCost }) => {
-  const tax = calculateTax(subtotal);
+const calculateOrderTotal = ({ subtotal, shippingCost = 0, discount = 0 }) => {
+  const discountedSubtotal = Math.max(subtotal - discount, 0);
+  const tax = calculateTax(discountedSubtotal);
   return {
     tax,
-    total: roundMoney(subtotal + tax + shippingCost),
+    total: roundMoney(discountedSubtotal + tax + shippingCost),
   };
 };
 
@@ -136,10 +155,17 @@ const buildOrderItems = async (items = []) => {
       discountedPrice + (variant?.priceAdjustment || 0),
     );
 
+    const image =
+      (variant?.images && variant.images[0]) ||
+      (product.images && product.images[0]) ||
+      "";
+
     orderItems.push({
       product: product._id,
-      variant: variant?._id,
+      variant: variant?._id || null,
       name: `${product.name}${formatVariantName(variant)}`,
+      sku: variant?.sku || "",
+      image,
       price: Math.max(unitPrice, 0),
       quantity,
     });
@@ -229,14 +255,28 @@ const restoreOrderInventory = async (order) => {
 
 const buildOrderFilter = (query = {}) => {
   const filter = {};
-  if (query.status) filter.status = String(query.status).toUpperCase();
-  if (query.paymentStatus)
+  if (query.status) {
+    filter.status = String(query.status).toUpperCase();
+  }
+  if (query.paymentStatus) {
     filter["paymentInfo.status"] = String(query.paymentStatus).toUpperCase();
+  }
   if (query.user && mongoose.isValidObjectId(query.user)) {
     filter.user = new mongoose.Types.ObjectId(query.user);
   }
-  if (query.orderNumber)
-    filter.orderNumber = { $regex: query.orderNumber, $options: "i" };
+  if (query.orderNumber) {
+    filter.orderNumber = { $regex: query.orderNumber.trim(), $options: "i" };
+  }
+  if (query.search) {
+    const searchRegex = { $regex: query.search.trim(), $options: "i" };
+    filter.$or = [
+      { orderNumber: searchRegex },
+      { "shippingAddress.fullName": searchRegex },
+      { "shippingAddress.phone": searchRegex },
+      { "shippingAddress.city": searchRegex },
+      { "paymentInfo.transactionId": searchRegex },
+    ];
+  }
 
   if (query.fromDate || query.toDate) {
     filter.createdAt = {};
@@ -290,7 +330,13 @@ const createOrder = async (req, res) => {
       orderItems.reduce((total, item) => total + item.price * item.quantity, 0),
     );
     const shippingCost = toMoneyNumber(req.body.shippingCost);
-    const { tax, total } = calculateOrderTotal({ subtotal, shippingCost });
+    const discount = toMoneyNumber(req.body.discount);
+    const { tax, total } = calculateOrderTotal({
+      subtotal,
+      shippingCost,
+      discount,
+    });
+
     const paymentStatus = req.body.paymentInfo?.status
       ? String(req.body.paymentInfo.status).toUpperCase()
       : "PENDING";
@@ -304,21 +350,30 @@ const createOrder = async (req, res) => {
     await decrementInventory(orderItems);
 
     try {
+      const initialStatus =
+        paymentStatus === "PAID" ? "PAID" : "PENDING";
+
       const createdOrder = await orderModel.create({
         user,
         orderNumber: await generateOrderNumber(),
-        status: paymentStatus === "PAID" ? "PAID" : "PENDING",
+        status: initialStatus,
         items: orderItems,
-        shippingAddress: req.body.shippingAddress,
+        shippingAddress: req.body.shippingAddress || {},
+        billingAddress: req.body.billingAddress || req.body.shippingAddress || {},
         paymentInfo: {
-          method: req.body.paymentInfo?.method,
-          transactionId: req.body.paymentInfo?.transactionId,
+          method: req.body.paymentInfo?.method || "ONLINE_PAYMENT",
+          transactionId: req.body.paymentInfo?.transactionId || "",
           status: paymentStatus,
+          paidAt: paymentStatus === "PAID" ? new Date() : null,
+          receiptUrl: req.body.paymentInfo?.receiptUrl || "",
         },
         subtotal,
+        discount,
         tax,
         shippingCost,
         total,
+        customerNote: req.body.customerNote || "",
+        notes: req.body.notes || "",
       });
 
       const response = await populateOrder(
@@ -390,15 +445,28 @@ const getMyOrders = async (req, res) => {
         .json({ message: "User not found.", success: false });
     }
 
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const skip = (page - 1) * limit;
     const filter = { ...buildOrderFilter(req.query), user: authUser._id };
-    const orders = await populateOrder(
-      orderModel.find(filter).sort({ createdAt: -1 }),
-    );
+
+    const [orders, totalOrders] = await Promise.all([
+      populateOrder(
+        orderModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      ),
+      orderModel.countDocuments(filter),
+    ]);
 
     return res.status(200).json({
       success: true,
       message: `Total ${orders.length} orders fetched!`,
       data: orders,
+      pagination: {
+        page,
+        limit,
+        totalOrders,
+        totalPages: Math.ceil(totalOrders / limit),
+      },
     });
   } catch (error) {
     console.log("Get My Orders Error:", error);
@@ -458,30 +526,58 @@ const updateOrder = async (req, res) => {
         .json({ message: "Invalid order id.", success: false });
     }
 
-    const allowedUpdates = {};
-    if (req.body.shippingAddress)
-      allowedUpdates.shippingAddress = req.body.shippingAddress;
-    if (req.body.shippingCost !== undefined) {
-      allowedUpdates.shippingCost = toMoneyNumber(req.body.shippingCost);
-    }
-
     const order = await orderModel.findById(req.params.id);
     if (!order) {
       return res
         .status(404)
         .json({ message: "Order not found.", success: false });
     }
-    if (["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status)) {
+    if (["DELIVERED", "CANCELLED"].includes(order.status)) {
       return res.status(400).json({
-        message: "Only pending or paid orders can be updated.",
+        message: "Delivered or cancelled orders cannot be updated.",
         success: false,
       });
     }
 
-    const nextShippingCost = allowedUpdates.shippingCost ?? order.shippingCost;
+    const allowedUpdates = {};
+    if (req.body.shippingAddress) {
+      allowedUpdates.shippingAddress = {
+        ...order.shippingAddress?.toObject(),
+        ...req.body.shippingAddress,
+      };
+    }
+    if (req.body.billingAddress) {
+      allowedUpdates.billingAddress = {
+        ...order.billingAddress?.toObject(),
+        ...req.body.billingAddress,
+      };
+    }
+    if (req.body.shippingCost !== undefined) {
+      allowedUpdates.shippingCost = toMoneyNumber(req.body.shippingCost);
+    }
+    if (req.body.discount !== undefined) {
+      allowedUpdates.discount = toMoneyNumber(req.body.discount);
+    }
+    if (req.body.carrier !== undefined) {
+      allowedUpdates.carrier = req.body.carrier;
+    }
+    if (req.body.trackingNumber !== undefined) {
+      allowedUpdates.trackingNumber = req.body.trackingNumber;
+    }
+    if (req.body.customerNote !== undefined) {
+      allowedUpdates.customerNote = req.body.customerNote;
+    }
+    if (req.body.notes !== undefined) {
+      allowedUpdates.notes = req.body.notes;
+    }
+
+    const nextShippingCost =
+      allowedUpdates.shippingCost ?? order.shippingCost;
+    const nextDiscount = allowedUpdates.discount ?? order.discount;
     const { tax, total } = calculateOrderTotal({
       subtotal: order.subtotal,
       shippingCost: nextShippingCost,
+      discount: nextDiscount,
     });
     allowedUpdates.tax = tax;
     allowedUpdates.total = total;
@@ -500,6 +596,114 @@ const updateOrder = async (req, res) => {
     });
   } catch (error) {
     console.log("Update Order Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
+  }
+};
+
+const updateShippingAddress = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
+    }
+
+    const order = await orderModel.findById(req.params.id);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
+    }
+
+    if (!isAdminRequest(req)) {
+      const authUser = await getAuthUser(req);
+      if (!authUser || String(order.user) !== String(authUser._id)) {
+        return res
+          .status(403)
+          .json({ message: "You cannot modify this order.", success: false });
+      }
+    }
+
+    if (["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status)) {
+      return res.status(400).json({
+        message: "Shipping address cannot be updated after order is shipped or completed.",
+        success: false,
+      });
+    }
+
+    const newAddress = {
+      ...order.shippingAddress?.toObject(),
+      ...req.body,
+    };
+
+    order.shippingAddress = newAddress;
+    await order.save();
+
+    const updatedOrder = await populateOrder(orderModel.findById(order._id));
+    return res.status(200).json({
+      message: "Shipping address updated successfully.",
+      data: updatedOrder,
+      success: true,
+    });
+  } catch (error) {
+    console.log("Update Shipping Address Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
+  }
+};
+
+const recalculateOrderTotals = async (req, res) => {
+  try {
+    if (!isAdminRequest(req)) {
+      return res
+        .status(403)
+        .json({ message: "Admin access required.", success: false });
+    }
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
+    }
+
+    const order = await orderModel.findById(req.params.id);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
+    }
+
+    const subtotal = roundMoney(
+      order.items.reduce(
+        (total, item) => total + item.price * item.quantity,
+        0,
+      ),
+    );
+    const shippingCost = toMoneyNumber(order.shippingCost);
+    const discount = toMoneyNumber(order.discount);
+    const { tax, total } = calculateOrderTotal({
+      subtotal,
+      shippingCost,
+      discount,
+    });
+
+    const updatedOrder = await populateOrder(
+      orderModel.findByIdAndUpdate(
+        req.params.id,
+        { subtotal, discount, tax, total },
+        { new: true, runValidators: true },
+      ),
+    );
+
+    return res.status(200).json({
+      message: "Order totals recalculated successfully.",
+      data: updatedOrder,
+      success: true,
+    });
+  } catch (error) {
+    console.log("Recalculate Order Totals Error:", error);
     return res
       .status(500)
       .json({ message: "Internal Server Error", success: false });
@@ -544,13 +748,33 @@ const updateOrderStatus = async (req, res) => {
 
     if (status === "CANCELLED" && order.status !== "CANCELLED") {
       await restoreOrderInventory(order);
+      order.cancelledAt = new Date();
+      if (req.body.cancelReason) {
+        order.cancelReason = req.body.cancelReason;
+      }
+      if (order.paymentInfo.status === "PAID") {
+        order.paymentInfo.status = "REFUNDED";
+      }
+    }
+
+    if (status === "SHIPPED" && !order.shippedAt) {
+      order.shippedAt = new Date();
+      if (req.body.trackingNumber) order.trackingNumber = req.body.trackingNumber;
+      if (req.body.carrier) order.carrier = req.body.carrier;
+    }
+
+    if (status === "DELIVERED" && !order.deliveredAt) {
+      order.deliveredAt = new Date();
+    }
+
+    if (status === "PAID") {
+      order.paymentInfo.status = "PAID";
+      if (!order.paymentInfo.paidAt) {
+        order.paymentInfo.paidAt = new Date();
+      }
     }
 
     order.status = status;
-    if (status === "PAID") order.paymentInfo.status = "PAID";
-    if (status === "CANCELLED" && order.paymentInfo.status === "PAID") {
-      order.paymentInfo.status = "REFUNDED";
-    }
     await order.save();
 
     const updatedOrder = await populateOrder(orderModel.findById(order._id));
@@ -569,15 +793,26 @@ const updateOrderStatus = async (req, res) => {
 
 const updatePaymentInfo = async (req, res) => {
   try {
-    if (!isAdminRequest(req)) {
-      return res
-        .status(403)
-        .json({ message: "Admin access required.", success: false });
-    }
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res
         .status(400)
         .json({ message: "Invalid order id.", success: false });
+    }
+
+    const order = await orderModel.findById(req.params.id);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
+    }
+
+    if (!isAdminRequest(req)) {
+      const authUser = await getAuthUser(req);
+      if (!authUser || String(order.user) !== String(authUser._id)) {
+        return res
+          .status(403)
+          .json({ message: "You cannot access this order.", success: false });
+      }
     }
 
     const paymentStatus = req.body.status
@@ -590,22 +825,32 @@ const updatePaymentInfo = async (req, res) => {
       });
     }
 
-    const order = await orderModel.findById(req.params.id);
-    if (!order) {
-      return res
-        .status(404)
-        .json({ message: "Order not found.", success: false });
-    }
-
-    if (req.body.method !== undefined)
+    if (req.body.method !== undefined) {
       order.paymentInfo.method = req.body.method;
+    }
     if (req.body.transactionId !== undefined) {
       order.paymentInfo.transactionId = req.body.transactionId;
     }
-    if (paymentStatus) order.paymentInfo.status = paymentStatus;
-    if (paymentStatus === "PAID" && order.status === "PENDING") {
-      order.status = "PAID";
+    if (req.body.receiptUrl !== undefined) {
+      order.paymentInfo.receiptUrl = req.body.receiptUrl;
     }
+
+    if (paymentStatus) {
+      order.paymentInfo.status = paymentStatus;
+      if (paymentStatus === "PAID") {
+        order.paymentInfo.paidAt = new Date();
+        if (order.status === "PENDING") {
+          order.status = "PAID";
+        }
+      } else if (paymentStatus === "REFUNDED") {
+        if (order.status !== "CANCELLED") {
+          await restoreOrderInventory(order);
+          order.status = "CANCELLED";
+          order.cancelledAt = new Date();
+        }
+      }
+    }
+
     await order.save();
 
     const updatedOrder = await populateOrder(orderModel.findById(order._id));
@@ -646,17 +891,22 @@ const cancelOrder = async (req, res) => {
       }
     }
 
-    if (!["PENDING", "PAID"].includes(order.status)) {
+    if (["SHIPPED", "DELIVERED", "CANCELLED"].includes(order.status)) {
       return res.status(400).json({
-        message: "Only pending or paid orders can be cancelled.",
+        message: `Order in ${order.status} state cannot be cancelled.`,
         success: false,
       });
     }
 
     await restoreOrderInventory(order);
     order.status = "CANCELLED";
-    if (order.paymentInfo.status === "PAID")
+    order.cancelledAt = new Date();
+    if (req.body.cancelReason) {
+      order.cancelReason = req.body.cancelReason;
+    }
+    if (order.paymentInfo.status === "PAID") {
       order.paymentInfo.status = "REFUNDED";
+    }
     await order.save();
 
     const updatedOrder = await populateOrder(orderModel.findById(order._id));
@@ -692,9 +942,9 @@ const deleteOrder = async (req, res) => {
         .status(404)
         .json({ message: "Order not found.", success: false });
     }
-    if (order.status !== "CANCELLED") {
+    if (order.status !== "CANCELLED" && !req.body.force) {
       return res.status(400).json({
-        message: "Only cancelled orders can be deleted.",
+        message: "Only cancelled orders can be deleted. Use force=true if required.",
         success: false,
       });
     }
@@ -740,6 +990,10 @@ const getOrderSummary = async (req, res) => {
       { $match: filter },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
+    const paymentStatusCounts = await orderModel.aggregate([
+      { $match: filter },
+      { $group: { _id: "$paymentInfo.status", count: { $sum: 1 } } },
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -749,7 +1003,11 @@ const getOrderSummary = async (req, res) => {
         revenue: roundMoney(summary?.revenue || 0),
         averageOrderValue: roundMoney(summary?.averageOrderValue || 0),
         statusCounts: statusCounts.reduce((acc, item) => {
-          acc[item._id] = item.count;
+          if (item._id) acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        paymentStatusCounts: paymentStatusCounts.reduce((acc, item) => {
+          if (item._id) acc[item._id] = item.count;
           return acc;
         }, {}),
       },
@@ -762,15 +1020,199 @@ const getOrderSummary = async (req, res) => {
   }
 };
 
+const createStripePaymentIntentHandler = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid order id.", success: false });
+    }
+
+    const order = await orderModel.findById(req.params.id);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ message: "Order not found.", success: false });
+    }
+
+    if (!isAdminRequest(req)) {
+      const authUser = await getAuthUser(req);
+      if (!authUser || String(order.user) !== String(authUser._id)) {
+        return res
+          .status(403)
+          .json({ message: "You cannot access this order.", success: false });
+      }
+    }
+
+    if (order.status === "CANCELLED" || order.status === "DELIVERED") {
+      return res.status(400).json({
+        message: `Cannot process payment for ${order.status} order.`,
+        success: false,
+      });
+    }
+
+    if (order.paymentInfo?.status === "PAID") {
+      return res.status(400).json({
+        message: "Order is already paid.",
+        success: false,
+      });
+    }
+
+    const authUser = await getAuthUser(req);
+    const paymentIntent = await createPaymentIntent({
+      amount: order.total,
+      currency: config.STRIPE_CURRENCY,
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      customerEmail: order.shippingAddress?.email || authUser?.email,
+    });
+
+    order.paymentInfo.transactionId = paymentIntent.id;
+    order.paymentInfo.method = "STRIPE";
+    await order.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Stripe PaymentIntent created successfully.",
+      data: {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: order.total,
+        currency: paymentIntent.currency,
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+      },
+    });
+  } catch (error) {
+    console.log("Create Stripe Payment Intent Error:", error);
+    return res.status(500).json({
+      message: error.message || "Failed to create payment intent.",
+      success: false,
+    });
+  }
+};
+
+const handleStripeWebhook = async (req, res) => {
+  const signature = req.headers["stripe-signature"];
+
+  let event;
+  try {
+    if (config.STRIPE_WEBHOOK_SECRET) {
+      event = constructWebhookEvent(req.rawBody || req.body, signature);
+    } else {
+      // Fallback in dev if webhook secret is not yet set
+      event = req.body;
+    }
+  } catch (error) {
+    console.log("Stripe Webhook Signature Verification Error:", error.message);
+    return res.status(400).send(`Webhook Error: ${error.message}`);
+  }
+
+  console.log(`[Stripe Webhook] Received verified event: ${event.type}`);
+
+  try {
+    switch (event.type) {
+      case "payment_intent.succeeded":
+      case "charge.succeeded": {
+        const dataObj = event.data.object;
+        const orderId = dataObj.metadata?.orderId;
+        const orderNumber = dataObj.metadata?.orderNumber;
+        const transactionId = dataObj.id || dataObj.payment_intent;
+
+        let order = null;
+        if (orderId && mongoose.isValidObjectId(orderId)) {
+          order = await orderModel.findById(orderId);
+        }
+        if (!order && orderNumber) {
+          order = await orderModel.findOne({ orderNumber });
+        }
+        if (!order && transactionId) {
+          order = await orderModel.findOne({
+            "paymentInfo.transactionId": transactionId,
+          });
+        }
+
+        if (order) {
+          order.paymentInfo.status = "PAID";
+          if (transactionId) {
+            order.paymentInfo.transactionId = transactionId;
+          }
+          order.paymentInfo.paidAt = new Date();
+          order.paymentInfo.method = "STRIPE";
+
+          const receiptUrl =
+            dataObj.receipt_url ||
+            dataObj.charges?.data?.[0]?.receipt_url ||
+            dataObj.latest_charge?.receipt_url ||
+            order.paymentInfo.receiptUrl;
+          if (receiptUrl) {
+            order.paymentInfo.receiptUrl = receiptUrl;
+          }
+
+          if (order.status === "PENDING") {
+            order.status = "PAID";
+          }
+
+          await order.save();
+          console.log(`[Stripe Webhook] Order ${order.orderNumber} successfully marked as PAID!`);
+        } else {
+          console.log(
+            `[Stripe Webhook] ${event.type} received for ${transactionId}, but no matching order found in database.`,
+          );
+        }
+        break;
+      }
+
+      case "payment_intent.payment_failed": {
+        const dataObj = event.data.object;
+        const orderId = dataObj.metadata?.orderId;
+        const transactionId = dataObj.id;
+
+        let order = null;
+        if (orderId && mongoose.isValidObjectId(orderId)) {
+          order = await orderModel.findById(orderId);
+        }
+        if (!order && transactionId) {
+          order = await orderModel.findOne({
+            "paymentInfo.transactionId": transactionId,
+          });
+        }
+
+        if (order) {
+          order.paymentInfo.status = "FAILED";
+          await order.save();
+          console.log(`[Stripe Webhook] Order ${order.orderNumber} payment failed.`);
+        }
+        break;
+      }
+
+      default:
+        console.log(`[Stripe Webhook] Handled unmonitored event type: ${event.type}`);
+        break;
+    }
+
+    return res.status(200).json({ received: true });
+  } catch (error) {
+    console.log("Stripe Webhook Processing Error:", error);
+    return res.status(500).json({ error: "Webhook handler failed." });
+  }
+};
+
 export {
   createOrder,
   getAllOrders,
   getMyOrders,
   getOrderById,
   updateOrder,
+  updateShippingAddress,
+  recalculateOrderTotals,
   updateOrderStatus,
   updatePaymentInfo,
+  createStripePaymentIntentHandler,
+  handleStripeWebhook,
   cancelOrder,
   deleteOrder,
   getOrderSummary,
 };
+
+

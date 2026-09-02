@@ -13,7 +13,27 @@ import orderRoute from "./src/routes/order.route.js";
 // import roleRoute from "./src/routes/role.route.js";
 import { connectRedis, setCache, getCache } from "./src/config/redisClient.js";
 
-app.use(express.json());
+import { handleStripeWebhook } from "./src/controllers/order.controller.js";
+
+// Stripe webhook requires raw body buffer for signature verification
+app.post(
+  "/api/v1/order/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook,
+);
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook,
+);
+
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 app.use(
   cors(
     "http://localhost:4000",
@@ -27,12 +47,14 @@ app.listen(port, () => {
 app.get("/", (req, res) => {
   res.send("API Start working");
 });
+
 app.use("/api/v1/user", userRoute);
 app.use("/api/v1/category", categoryRoute);
 // app.use("/api/v1/unit", unitRoute);
 app.use("/api/v1/product", productRoute);
 app.use("/api/v1/order", orderRoute);
 // app.use("/api/v1/role", roleRoute);
+app.post("/webhook", handleStripeWebhook);
 
 mongoose
   .connect(mongodb_url)

@@ -14,6 +14,12 @@ const OrderItemSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  sku: {
+    type: String,
+  },
+  image: {
+    type: String,
+  },
   price: {
     type: Number,
     required: true,
@@ -26,11 +32,67 @@ const OrderItemSchema = new mongoose.Schema({
 });
 
 const AddressSnapshotSchema = new mongoose.Schema({
-  street: String,
-  city: String,
-  state: String,
-  zipCode: String,
-  country: String,
+  fullName: {
+    type: String,
+    trim: true,
+  },
+  phone: {
+    type: String,
+    trim: true,
+  },
+  email: {
+    type: String,
+    trim: true,
+  },
+  street: {
+    type: String,
+    trim: true,
+  },
+  addressLine2: {
+    type: String,
+    trim: true,
+  },
+  city: {
+    type: String,
+    trim: true,
+  },
+  state: {
+    type: String,
+    trim: true,
+  },
+  zipCode: {
+    type: String,
+    trim: true,
+  },
+  country: {
+    type: String,
+    trim: true,
+  },
+});
+
+const PaymentInfoSchema = new mongoose.Schema({
+  method: {
+    type: String,
+    trim: true,
+    default: "ONLINE_PAYMENT",
+  },
+  transactionId: {
+    type: String,
+    trim: true,
+  },
+  status: {
+    type: String,
+    enum: ["PENDING", "PAID", "FAILED", "REFUNDED"],
+    default: "PENDING",
+  },
+  paidAt: {
+    type: Date,
+    default: null,
+  },
+  receiptUrl: {
+    type: String,
+    trim: true,
+  },
 });
 
 const orderModelSchema = new mongoose.Schema(
@@ -47,19 +109,30 @@ const orderModelSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"],
+      enum: [
+        "PENDING",
+        "PROCESSING",
+        "PAID",
+        "SHIPPED",
+        "DELIVERED",
+        "CANCELLED",
+      ],
       default: "PENDING",
     },
     items: [OrderItemSchema],
     shippingAddress: AddressSnapshotSchema,
+    billingAddress: AddressSnapshotSchema,
     paymentInfo: {
-      method: String,
-      transactionId: String,
-      status: String,
+      type: PaymentInfoSchema,
+      default: () => ({}),
     },
     subtotal: {
       type: Number,
       required: true,
+    },
+    discount: {
+      type: Number,
+      default: 0,
     },
     tax: {
       type: Number,
@@ -73,6 +146,38 @@ const orderModelSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    customerNote: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+    carrier: {
+      type: String,
+      trim: true,
+    },
+    trackingNumber: {
+      type: String,
+      trim: true,
+    },
+    shippedAt: {
+      type: Date,
+      default: null,
+    },
+    deliveredAt: {
+      type: Date,
+      default: null,
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    cancelReason: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -80,3 +185,4 @@ const orderModelSchema = new mongoose.Schema(
 );
 
 export default mongoose.model("order", orderModelSchema);
+
