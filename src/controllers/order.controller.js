@@ -287,6 +287,49 @@ const buildOrderFilter = (query = {}) => {
   return filter;
 };
 
+const previewOrder = async (req, res) => {
+  try {
+    const { error, orderItems } = await buildOrderItems(req.body.items);
+    if (error) {
+      return res.status(400).json({ message: error, success: false });
+    }
+
+    const subtotal = roundMoney(
+      orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    );
+    const shippingCost =
+      req.body.shippingCost !== undefined
+        ? toMoneyNumber(req.body.shippingCost)
+        : subtotal >= 50
+          ? 0
+          : 5.0;
+    const discount = toMoneyNumber(req.body.discount);
+    const { tax, total } = calculateOrderTotal({
+      subtotal,
+      shippingCost,
+      discount,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Order price review calculated successfully.",
+      data: {
+        items: orderItems,
+        subtotal,
+        discount,
+        tax,
+        shippingCost,
+        total,
+      },
+    });
+  } catch (error) {
+    console.log("Preview Order Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", success: false });
+  }
+};
+
 const createOrder = async (req, res) => {
   let orderItems = [];
   try {
@@ -328,7 +371,7 @@ const createOrder = async (req, res) => {
 
     const subtotal = roundMoney(
       orderItems.reduce((total, item) => total + item.price * item.quantity, 0),
-    );
+    ); 
     const shippingCost = toMoneyNumber(req.body.shippingCost);
     const discount = toMoneyNumber(req.body.discount);
     const { tax, total } = calculateOrderTotal({
@@ -1199,6 +1242,7 @@ const handleStripeWebhook = async (req, res) => {
 };
 
 export {
+  previewOrder,
   createOrder,
   getAllOrders,
   getMyOrders,

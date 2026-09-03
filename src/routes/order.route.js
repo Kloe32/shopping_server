@@ -9,6 +9,7 @@ import {
   getOrderById,
   getOrderSummary,
   handleStripeWebhook,
+  previewOrder,
   recalculateOrderTotals,
   updateOrder,
   updateOrderStatus,
@@ -28,6 +29,7 @@ import {
 
 const router = express.Router();
 
+router.post("/preview", verifyToken, createOrderValidator, validate, previewOrder);
 router.post("/create", verifyToken, createOrderValidator, validate, createOrder);
 router.post(
   "/create-payment-intent/:id",

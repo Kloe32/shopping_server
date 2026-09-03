@@ -50,11 +50,8 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1/user", userRoute);
 app.use("/api/v1/category", categoryRoute);
-// app.use("/api/v1/unit", unitRoute);
 app.use("/api/v1/product", productRoute);
 app.use("/api/v1/order", orderRoute);
-// app.use("/api/v1/role", roleRoute);
-app.post("/webhook", handleStripeWebhook);
 
 mongoose
   .connect(mongodb_url)
